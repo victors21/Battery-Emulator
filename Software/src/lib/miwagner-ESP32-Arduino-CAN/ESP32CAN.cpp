@@ -1,6 +1,6 @@
 #include "ESP32CAN.h"
 #include <Arduino.h>
-#include "../../devboard/utils/events.h"
+#include "../../utils/events.h"
 
 int ESP32CAN::CANInit() {
   return CAN_init();

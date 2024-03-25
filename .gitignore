@@ -4,6 +4,9 @@
 # Ignore any files in any build folder
 *build/
 
+# Ignore stuff in trash
+*trash/
+
 # Ignore .exe (unit tests)
 *.exe
 **/.DS_Store

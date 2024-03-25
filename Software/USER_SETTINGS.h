@@ -1,11 +1,14 @@
 #ifndef __USER_SETTINGS_H__
 #define __USER_SETTINGS_H__
 #include <stdint.h>
-
 /* This file contains all the battery/inverter protocol settings Battery-Emulator software */
 /* To switch between batteries/inverters, uncomment a line to enable, comment out to disable. */
 /* There are also some options for battery limits and extra functionality */
 /* To edit battery specific limits, see also the USER_SETTINGS.cpp file*/
+
+/* Select HW used */
+#define HW_LILYGO
+//#define HW_BATTERY_EMULATOR_v0
 
 /* Select battery used */
 //#define BMW_I3_BATTERY
