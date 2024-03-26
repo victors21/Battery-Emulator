@@ -1,7 +1,7 @@
 #ifndef _HAL_H_
 #define _HAL_H_
 
-#include "../../USER_SETTINGS.h"
+#include "../system_include.h"
 
 #if defined(HW_LILYGO)
 #include "hw_lilygo.h"

@@ -45,9 +45,7 @@
 #define RED 3
 #define TEST_ALL_COLORS 10
 
-// Common definitions
-#define MAX_AMOUNT_CELLS 192
-
+/* ----- Error checks below, don't change ----- */
 #ifndef HW_CONFIGURED
 #define HW_CONFIGURED
 #else

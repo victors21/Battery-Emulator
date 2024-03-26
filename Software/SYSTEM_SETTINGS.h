@@ -38,8 +38,33 @@
  * Description:
  * Defines the size of the queue for RX frames
  * 
+ * Parameter: CAN_BAUD_RATE
+ * Description:
+ * Defines the baud rate for battery CAN.
+ * 
 */
 #define CAN_RX_QUEUE_SIZE 10
 #define CAN_BAUD_RATE CAN_SPEED_500KBPS
+
+/** TASKS
+ * 
+ * Parameter: TASK_CORE_PRIO
+ * Description:
+ * Defines the priority of core functionality (CAN, Modbus, etc)
+ * 
+ * Parameter: TASK_CONNECTIVITY_PRIO
+ * Description:
+ * Defines the priority of various wireless functionality (TCP, MQTT, etc)
+*/
+#define TASK_CORE_PRIO 4
+#define TASK_CONNECTIVITY_PRIO 3
+
+/** MAX AMOUNT OF CELLS 
+ * 
+ * Parameter: MAX_AMOUNT_CELLS
+ * Description:
+ * Basically the length of the array used to hold individual cell voltages
+*/
+#define MAX_AMOUNT_CELLS 192
 
 #endif

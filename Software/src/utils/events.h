@@ -1,6 +1,8 @@
 #ifndef __EVENTS_H__
 #define __EVENTS_H__
+
 #include <stdint.h>
+#include "../system_include.h"
 
 #ifndef UNIT_TEST
 #include <Arduino.h>

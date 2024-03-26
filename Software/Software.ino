@@ -19,9 +19,9 @@ void setup() {
 
   debug_init();
 
-  init_watchdog();
+  watchdog_init();
 
-  init_tasks();
+  task_init();
 
   // BOOT button at runtime is used as an input for various things
   pinMode(0, INPUT_PULLUP);
@@ -35,19 +35,19 @@ void loop() {
   }
 }
 
-void init_watchdog(void) {
+void watchdog_init(void) {
   watchdog.check_reset_reason();
   esp_task_wdt_init(TASK_BACKGROUND_WATCHDOG_PERIOD, true);  // Timeout period and panic handle true
   esp_task_wdt_add(NULL);                                    // Add current thread to watchdog
 }
 
-void init_tasks(void) {
+void task_init(void) {
   // Core
   xTaskCreatePinnedToCore(core_task,          // Task function
                           "core_task",        // Name of the task
                           1024,               // Stack size (in words)
                           NULL,               // Task input parameter
-                          1,                  // Priority of the task
+                          TASK_CORE_PRIO,     // Priority of the task
                           NULL,               // Task handle
                           MAIN_FUNCTION_CORE  // Core number
   );

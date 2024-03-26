@@ -2,6 +2,7 @@
 // eModbus: Copyright 2020 by Michael Harwerth, Bert Melis and the contributors to eModbus
 //               MIT license - see license.md for details
 // =================================================================================================
+#include "../../system_include.h"
 #include "ModbusServerRTU.h"
 
 #if HAS_FREERTOS
@@ -89,7 +90,7 @@ void ModbusServerRTU::doBegin(uint32_t baudRate, int coreID) {
   snprintf(taskName, 18, "MBsrv%02XRTU", instanceCounter);
 
   // Start task to handle the client
-  xTaskCreatePinnedToCore((TaskFunction_t)&serve, taskName, 4096, this, 8, &serverTask, coreID >= 0 ? coreID : NULL);
+  xTaskCreatePinnedToCore((TaskFunction_t)&serve, taskName, 4096, this, TASK_CORE_PRIO, &serverTask, MAIN_FUNCTION_CORE);
 
   LOG_D("Server task %d started. Interval=%d\n", (uint32_t)serverTask, MSRinterval);
 }

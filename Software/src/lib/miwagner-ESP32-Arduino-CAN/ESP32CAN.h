@@ -1,8 +1,8 @@
 #ifndef ESP32CAN_H
 #define ESP32CAN_H
 
-#include "../../lib/miwagner-ESP32-Arduino-CAN/CAN.h"
-#include "../../lib/miwagner-ESP32-Arduino-CAN/CAN_config.h"
+#include "CAN.h"
+#include "CAN_config.h"
 
 class ESP32CAN {
  public:
