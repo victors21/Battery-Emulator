@@ -29,10 +29,8 @@ void setup() {
 
 // Perform main program functions
 void loop() {
-  if (watchdog.is_complete()) {
-    // Reset the watchdog timer
-    watchdog.reset();
-  }
+  // Attempt to reset the watchdog timer
+  watchdog.reset();
 }
 
 void watchdog_init(void) {

@@ -3,13 +3,11 @@
 #include <Arduino.h>
 #include "../../lib/miwagner-ESP32-Arduino-CAN/CAN_config.h"
 #include "../../lib/miwagner-ESP32-Arduino-CAN/ESP32CAN.h"
-#include "../../utils/watchdog.h"
 #include "core.h"
 #include "datalayer/datalayer.h"
+#include "led.h"
 
-typedef struct {
-  DataLayer datalayer;
-} CORE_TYPE;
+LED led(led_mode::LED_MODE_DEFAULT);
 
 CAN_device_t CAN_cfg;  // CAN Config
 
@@ -22,8 +20,22 @@ void core_task(void* parameter) {
   // Initialize the xLastWakeTime variable with the current time.
 
   can_init();
+  led.init();
+
+  Serial.println(map_float(0.000f, 0.0f, 0.1f, 0.2f, 0.3f));
+  Serial.println(map_float(0.025f, 0.0f, 0.1f, 0.2f, 0.3f));
+  Serial.println(map_float(0.050f, 0.0f, 0.1f, 0.2f, 0.3f));
+  Serial.println(map_float(0.075f, 0.0f, 0.1f, 0.2f, 0.3f));
+  Serial.println(map_float(0.100f, 0.0f, 0.1f, 0.2f, 0.3f));
+
+  Serial.println(map_float(0.000f, 0.0f, 0.1f, 0.3f, 0.2f));
+  Serial.println(map_float(0.025f, 0.0f, 0.1f, 0.3f, 0.2f));
+  Serial.println(map_float(0.050f, 0.0f, 0.1f, 0.3f, 0.2f));
+  Serial.println(map_float(0.075f, 0.0f, 0.1f, 0.3f, 0.2f));
+  Serial.println(map_float(0.100f, 0.0f, 0.1f, 0.3f, 0.2f));
 
   for (;;) {
+    led.run();
     watchdog.kick_battery_side();
     watchdog.kick_inverter_side();
     delay(1);

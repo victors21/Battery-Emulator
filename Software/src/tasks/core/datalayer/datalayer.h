@@ -23,7 +23,7 @@ typedef struct {
   /** float */
   float temperature_max_C;
   float temperature_min_C;
-  float current_A;
+  float current_A;  // Positive current means discharging, since that's most intuitive from a circuit diagram
   float voltage_V;
   float soh_pct;
   // float soc_real_pct;
@@ -33,7 +33,7 @@ typedef struct {
   uint32_t remaining_capacity;
 
   /** int16_t */
-  int16_t active_power_W;
+  int16_t active_power_W;  // Positive value means discharging, since that's most intuitive from a circuit diagram
 
   /** uint16_t */
   uint16_t max_discharge_power_W;
@@ -52,9 +52,14 @@ typedef struct {
   DATALAYER_BATTERY_STATUS_TYPE status;
 } DATALAYER_BATTERY_TYPE;
 
+typedef struct {
+
+} DATALAYER_SETTINGS_TYPE;
+
 class DataLayer {
  public:
   DATALAYER_BATTERY_TYPE battery;
+  DATALAYER_SETTINGS_TYPE settings;
 };
 
 extern DataLayer datalayer;
