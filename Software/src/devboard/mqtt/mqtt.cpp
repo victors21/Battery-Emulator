@@ -160,6 +160,7 @@ static void publish_common_info(void) {
     doc["cell_min_voltage"] = ((float)system_cell_min_voltage_mV) / 1000.0;
     doc["battery_voltage"] = ((float)system_battery_voltage_dV) / 10.0;
     doc["bms_status"] = ((float)system_bms_status);
+    doc["led_color"] = ((float)LEDcolor);
 
     serializeJson(doc, mqtt_msg);
     if (!mqtt_publish(state_topic.c_str(), mqtt_msg, false)) {
