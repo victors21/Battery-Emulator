@@ -111,6 +111,7 @@ SensorConfig sensorConfigs[] = {
     {"cell_max_voltage", "Battery Emulator Cell Max Voltage", "{{ value_json.cell_max_voltage }}", "V", "voltage"},
     {"cell_min_voltage", "Battery Emulator Cell Min Voltage", "{{ value_json.cell_min_voltage }}", "V", "voltage"},
     {"battery_voltage", "Battery Emulator Battery Voltage", "{{ value_json.battery_voltage }}", "V", "voltage"},
+    {"bms_status", "Battery Emulator BMS Status", "{{ value_json.bms_status }}", "", "none"},
 };
 
 static String generateCommonInfoAutoConfigTopic(const char* object_id, const char* hostname) {
@@ -158,6 +159,7 @@ static void publish_common_info(void) {
     doc["cell_max_voltage"] = ((float)system_cell_max_voltage_mV) / 1000.0;
     doc["cell_min_voltage"] = ((float)system_cell_min_voltage_mV) / 1000.0;
     doc["battery_voltage"] = ((float)system_battery_voltage_dV) / 10.0;
+    doc["bms_status"] = ((float)system_bms_status);
 
     serializeJson(doc, mqtt_msg);
     if (!mqtt_publish(state_topic.c_str(), mqtt_msg, false)) {
