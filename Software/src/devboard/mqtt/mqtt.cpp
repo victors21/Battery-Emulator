@@ -111,7 +111,7 @@ SensorConfig sensorConfigs[] = {
     {"cell_max_voltage", "Battery Emulator Cell Max Voltage", "{{ value_json.cell_max_voltage }}", "V", "voltage"},
     {"cell_min_voltage", "Battery Emulator Cell Min Voltage", "{{ value_json.cell_min_voltage }}", "V", "voltage"},
     {"battery_voltage", "Battery Emulator Battery Voltage", "{{ value_json.battery_voltage }}", "V", "voltage"},
-    {"bms_status", "Battery Emulator BMS Status", "{{ value_json.bms_status }}", "", "none"},
+    {"bms_status", "Battery Emulator BMS Status", "{{ value_json.bms_status }}", "°C", "temperature"},
 };
 
 static String generateCommonInfoAutoConfigTopic(const char* object_id, const char* hostname) {
