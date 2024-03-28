@@ -4,11 +4,11 @@
 #include "../../lib/miwagner-ESP32-Arduino-CAN/CAN_config.h"
 #include "../../lib/miwagner-ESP32-Arduino-CAN/ESP32CAN.h"
 #include "core.h"
-#include "datalayer/datalayer.h"
 #include "led.h"
+#include "system/datalayer.h"
 
 LED led(led_mode::LED_MODE_DEFAULT);
-
+DataLayer datalayer;
 CAN_device_t CAN_cfg;  // CAN Config
 
 static void can_init(void);
@@ -21,18 +21,6 @@ void core_task(void* parameter) {
 
   can_init();
   led.init();
-
-  Serial.println(map_float(0.000f, 0.0f, 0.1f, 0.2f, 0.3f));
-  Serial.println(map_float(0.025f, 0.0f, 0.1f, 0.2f, 0.3f));
-  Serial.println(map_float(0.050f, 0.0f, 0.1f, 0.2f, 0.3f));
-  Serial.println(map_float(0.075f, 0.0f, 0.1f, 0.2f, 0.3f));
-  Serial.println(map_float(0.100f, 0.0f, 0.1f, 0.2f, 0.3f));
-
-  Serial.println(map_float(0.000f, 0.0f, 0.1f, 0.3f, 0.2f));
-  Serial.println(map_float(0.025f, 0.0f, 0.1f, 0.3f, 0.2f));
-  Serial.println(map_float(0.050f, 0.0f, 0.1f, 0.3f, 0.2f));
-  Serial.println(map_float(0.075f, 0.0f, 0.1f, 0.3f, 0.2f));
-  Serial.println(map_float(0.100f, 0.0f, 0.1f, 0.3f, 0.2f));
 
   for (;;) {
     led.run();

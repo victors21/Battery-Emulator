@@ -1,5 +1,5 @@
 #include "led.h"
-#include "datalayer/datalayer.h"
+#include "system/datalayer.h"
 
 #define COLOR_GREEN(x) (((uint32_t)0 << 16) | ((uint32_t)x << 8) | 0)
 #define COLOR_YELLOW(x) (((uint32_t)x << 16) | ((uint32_t)x << 8) | 0)
@@ -7,6 +7,11 @@
 #define COLOR_BLUE(x) (((uint32_t)0 << 16) | ((uint32_t)0 << 8) | x)
 
 #define BPM_TO_MS(x) ((uint16_t)((60.0f / ((float)x)) * 1000))
+
+static const float heartbeat_base = 0.15;
+static const float heartbeat_peak1 = 0.80;
+static const float heartbeat_peak2 = 0.55;
+static const float heartbeat_deviation = 0.05;
 
 void LED::run(void) {
   static bool test_all_colors = true;
@@ -68,9 +73,15 @@ void LED::classic_run(void) {
 
 void LED::flow_run(void) {
   // Determine how bright the LED should be
-  static bool power_positive = true;
-
-  brightness = power_positive ? up_down(0.95) : max_brightness - up_down(0.95);
+  bool power_positive;
+  int16_t power_W = datalayer.battery.status.active_power_W;
+  if (power_W > 50) {
+    brightness = up_down(0.95);
+  } else if (power_W < -50) {
+    brightness = max_brightness - up_down(0.95);
+  } else {
+    brightness = up_down(0.5);
+  }
 }
 
 void LED::heartbeat_run(void) {
@@ -86,7 +97,7 @@ void LED::heartbeat_run(void) {
       break;
     default:
       // Keep default chill bpm (ba-dunk... ba-dunk... ba-dunk...)
-      period = BPM_TO_MS(40);
+      period = BPM_TO_MS(35);
       break;
   }
 
@@ -96,19 +107,19 @@ void LED::heartbeat_run(void) {
   float brightness_f;
 
   if (period_pct < 0.10) {
-    brightness_f = map_float(period_pct, 0.00f, 0.10f, 0.20f, 0.25f);
+    brightness_f = map_float(period_pct, 0.00f, 0.10f, heartbeat_base, heartbeat_base);
   } else if (period_pct < 0.20) {
-    brightness_f = map_float(period_pct, 0.10f, 0.20f, 0.25f, 0.15f);
+    brightness_f = map_float(period_pct, 0.10f, 0.20f, heartbeat_base, heartbeat_base - heartbeat_deviation);
   } else if (period_pct < 0.25) {
-    brightness_f = map_float(period_pct, 0.20f, 0.25f, 0.15f, 0.80f);
+    brightness_f = map_float(period_pct, 0.20f, 0.25f, heartbeat_base - heartbeat_deviation, heartbeat_peak1);
   } else if (period_pct < 0.30) {
-    brightness_f = map_float(period_pct, 0.25f, 0.30f, 0.80f, 0.20f);
-  } else if (period_pct < 0.45) {
-    brightness_f = map_float(period_pct, 0.30f, 0.45f, 0.20f, 0.55f);
+    brightness_f = map_float(period_pct, 0.25f, 0.30f, heartbeat_peak1, heartbeat_base - heartbeat_deviation);
+  } else if (period_pct < 0.40) {
+    brightness_f = map_float(period_pct, 0.30f, 0.40f, heartbeat_base - heartbeat_deviation, heartbeat_peak2);
   } else if (period_pct < 0.55) {
-    brightness_f = map_float(period_pct, 0.45f, 0.55f, 0.55f, 0.20f);
+    brightness_f = map_float(period_pct, 0.40f, 0.55f, heartbeat_peak2, heartbeat_base + heartbeat_deviation);
   } else {
-    brightness_f = map_float(period_pct, 0.55f, 1.00f, 0.20f, 0.20f);
+    brightness_f = map_float(period_pct, 0.55f, 1.00f, heartbeat_base + heartbeat_deviation, heartbeat_base);
   }
 
   brightness = (uint8_t)(brightness_f * LED_MAX_BRIGHTNESS);

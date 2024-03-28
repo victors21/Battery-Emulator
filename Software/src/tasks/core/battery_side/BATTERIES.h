@@ -56,6 +56,10 @@ void receive_can_battery();
 #else
 void receive_can_battery(CAN_frame_t rx_frame);
 #endif
+
+void battery_side_init(void);
+void battery_side_run(void);
+
 void update_values_battery();
 void send_can_battery();
 void setup_battery(void);

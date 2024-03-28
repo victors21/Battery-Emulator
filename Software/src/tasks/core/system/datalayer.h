@@ -30,10 +30,10 @@ typedef struct {
   // float soc_scaled_pct;
 
   /** uint32_t */
+  int16_t active_power_W;  // Positive value means discharging, since that's most intuitive from a circuit diagram
   uint32_t remaining_capacity;
 
   /** int16_t */
-  int16_t active_power_W;  // Positive value means discharging, since that's most intuitive from a circuit diagram
 
   /** uint16_t */
   uint16_t max_discharge_power_W;
