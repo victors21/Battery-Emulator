@@ -54,7 +54,7 @@ extern uint16_t system_cell_max_voltage_mV;                //mV, 0-5000 , Stores
 extern uint16_t system_cell_min_voltage_mV;                //mV, 0-5000, Stores the minimum cell millivolt value
 extern uint16_t system_cellvoltages_mV[MAX_AMOUNT_CELLS];  //Array with all cell voltages in mV
 extern uint8_t system_number_of_cells;                     //Total number of cell voltages, set by each battery
-extern uint8_t system_bms_status = ACTIVE;  //ACTIVE - [0..5]<>[STANDBY,INACTIVE,DARKSTART,ACTIVE,FAULT,UPDATING]
+extern uint8_t system_bms_status;  //ACTIVE - [0..5]<>[STANDBY,INACTIVE,DARKSTART,ACTIVE,FAULT,UPDATING]
 
 extern const char* mqtt_user;
 extern const char* mqtt_password;
