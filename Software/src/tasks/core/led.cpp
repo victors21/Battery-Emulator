@@ -107,19 +107,20 @@ void LED::heartbeat_run(void) {
   float brightness_f;
 
   if (period_pct < 0.10) {
-    brightness_f = map_float(period_pct, 0.00f, 0.10f, heartbeat_base, heartbeat_base);
+    brightness_f = map_float(period_pct, 0.00f, 0.10f, heartbeat_base, heartbeat_base - heartbeat_deviation);
   } else if (period_pct < 0.20) {
-    brightness_f = map_float(period_pct, 0.10f, 0.20f, heartbeat_base, heartbeat_base - heartbeat_deviation);
+    brightness_f = map_float(period_pct, 0.10f, 0.20f, heartbeat_base - heartbeat_deviation,
+                             heartbeat_base - heartbeat_deviation * 2);
   } else if (period_pct < 0.25) {
-    brightness_f = map_float(period_pct, 0.20f, 0.25f, heartbeat_base - heartbeat_deviation, heartbeat_peak1);
+    brightness_f = map_float(period_pct, 0.20f, 0.25f, heartbeat_base - heartbeat_deviation * 2, heartbeat_peak1);
   } else if (period_pct < 0.30) {
     brightness_f = map_float(period_pct, 0.25f, 0.30f, heartbeat_peak1, heartbeat_base - heartbeat_deviation);
   } else if (period_pct < 0.40) {
     brightness_f = map_float(period_pct, 0.30f, 0.40f, heartbeat_base - heartbeat_deviation, heartbeat_peak2);
   } else if (period_pct < 0.55) {
-    brightness_f = map_float(period_pct, 0.40f, 0.55f, heartbeat_peak2, heartbeat_base + heartbeat_deviation);
+    brightness_f = map_float(period_pct, 0.40f, 0.55f, heartbeat_peak2, heartbeat_base + heartbeat_deviation * 2);
   } else {
-    brightness_f = map_float(period_pct, 0.55f, 1.00f, heartbeat_base + heartbeat_deviation, heartbeat_base);
+    brightness_f = map_float(period_pct, 0.55f, 1.00f, heartbeat_base + heartbeat_deviation * 2, heartbeat_base);
   }
 
   brightness = (uint8_t)(brightness_f * LED_MAX_BRIGHTNESS);

@@ -5,11 +5,17 @@
 #include <EEPROM.h>
 #include "HardwareSerial.h"
 
+#include "esp_timer.h"
 #include "src/system_include.h"
 #include "src/tasks/core/core.h"
 
+#define START_TIME_MEASUREMENT int64_t start_time = esp_timer_get_time()
+#define END_TIME_MEASUREMENT(task) task##_task_time = esp_timer_get_time() - start_time
+
 // The current software version
 const char* version_number = "6.0.0";
+
+int64_t core_task_time;
 
 WatchdogHandler watchdog;
 
@@ -49,4 +55,19 @@ void task_init(void) {
                           NULL,               // Task handle
                           MAIN_FUNCTION_CORE  // Core number
   );
+}
+
+static void core_task(void* parameter) {
+  TickType_t xLastWakeTime = xTaskGetTickCount();
+  const TickType_t xFrequency = pdMS_TO_TICKS(1);  // Convert 1ms to ticks
+
+  // Initialize the xLastWakeTime variable with the current time.
+  core_init();
+
+  for (;;) {
+    START_TIME_MEASUREMENT;
+    core_exe();
+    END_TIME_MEASUREMENT;
+    vTaskDelayUntil(&xLastWakeTime, xFrequency);
+  }
 }

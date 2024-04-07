@@ -7,26 +7,33 @@
 #include "led.h"
 #include "system/datalayer.h"
 
+extern "C" {
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+}
+
 LED led(led_mode::LED_MODE_DEFAULT);
 DataLayer datalayer;
 CAN_device_t CAN_cfg;  // CAN Config
+MyTimer rtos_timer(5000);
 
 static void can_init(void);
 
-void core_task(void* parameter) {
-  TickType_t xLastWakeTime = xTaskGetTickCount();
-  const TickType_t xFrequency = pdMS_TO_TICKS(10);  // Convert 10ms to ticks
-
-  // Initialize the xLastWakeTime variable with the current time.
-
+void core_init(void) {
   can_init();
   led.init();
+}
 
-  for (;;) {
-    led.run();
-    watchdog.kick_battery_side();
-    watchdog.kick_inverter_side();
-    delay(1);
+void core_exe(void) {
+  led.run();
+  watchdog.kick_battery_side();
+  watchdog.kick_inverter_side();
+
+  if (rtos_timer.elapsed()) {
+    UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark(NULL);
+
+    Serial.print("High Water Mark: ");
+    Serial.println(uxHighWaterMark);
   }
 }
 
