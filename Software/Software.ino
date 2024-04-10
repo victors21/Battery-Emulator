@@ -6,34 +6,31 @@
 #include "HardwareSerial.h"
 
 #include "esp_timer.h"
+#include "src/system/datalayer/datalayer.h"
 #include "src/system_include.h"
 #include "src/tasks/core/core.h"
+#include "src/utils/utils.h"
 
 #define START_TIME_MEASUREMENT int64_t start_time = esp_timer_get_time()
-#define END_TIME_MEASUREMENT(task) task##_task_time = esp_timer_get_time() - start_time
+#define END_TIME_MEASUREMENT *(int64_t*)task_time_us = esp_timer_get_time() - start_time
 
-// The current software version
-const char* version_number = "6.0.0";
-
-int64_t core_task_time;
+// Task time measurement for debugging and for setting CPU load events
+int64_t core_task_time_us;
 
 WatchdogHandler watchdog;
+DataLayer datalayer;
 
 // Initialization
 void setup() {
   EEPROM.begin(1024);
-
-  debug_init();
-
   watchdog_init();
-
   task_init();
 
   // BOOT button at runtime is used as an input for various things
   pinMode(0, INPUT_PULLUP);
 }
 
-// Perform main program functions
+// Perform background work (basically just kicking the watchdog)
 void loop() {
   // Attempt to reset the watchdog timer
   watchdog.reset();
@@ -46,18 +43,24 @@ void watchdog_init(void) {
 }
 
 void task_init(void) {
-  // Core
-  xTaskCreatePinnedToCore(core_task,          // Task function
-                          "core_task",        // Name of the task
-                          1024,               // Stack size (in words)
-                          NULL,               // Task input parameter
-                          TASK_CORE_PRIO,     // Priority of the task
-                          NULL,               // Task handle
-                          MAIN_FUNCTION_CORE  // Core number
+  // Core task
+  xTaskCreatePinnedToCore(
+      core_taskfn,         // Task function
+      "core_task",         // Name of the task
+      1024,                // Stack size (in words)
+      &core_task_time_us,  // Task input parameter, should be an int64_t if used for task execution measurement
+      TASK_CORE_PRIO,      // Priority of the task
+      NULL,                // Task handle
+      MAIN_FUNCTION_CORE   // Core number
   );
+  // Connectivity task, for handling Wifi setup and connection handling
+  // GOES HERE
+
+  // Other task??
+  // GOES HERE
 }
 
-static void core_task(void* parameter) {
+static void core_taskfn(void* task_time_us) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(1);  // Convert 1ms to ticks
 

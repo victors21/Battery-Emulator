@@ -1,6 +1,8 @@
 #ifndef __SOC_SCALING_H__
 #define __SOC_SCALING_H__
 
+#include "utils.h"
+
 class ScaledSoc {
  private:
   float min_real_soc, max_real_soc, real_soc, scaled_soc;
@@ -15,40 +17,13 @@ class ScaledSoc {
     soc_scaling_active = scaling_active;
   }
 
-  float set_real_soc(float soc) {
-    real_soc = soc;
-    scaled_soc = map_float(real_soc, 0.0f, 100.0f, min_real_soc, max_real_soc);
-    real_soc_initialized = true;
-    return scaled_soc;
-  }
-
-  float get_scaled_soc(void) {
-    if (real_soc_initialized) {
-      return scaled_soc;
-    } else {
-      return -1.0f;
-    }
-  }
-
-  float get_real_soc(void) {
-    if (real_soc_initialized) {
-      return real_soc;
-    } else {
-      return -1.0f;
-    }
-  }
-
-  float get_soc(void) {
-    if (real_soc_initialized) {
-      if (soc_scaling_active) {
-        return scaled_soc;
-      } else {
-        return real_soc;
-      }
-    } else {
-      return -1.0f;
-    }
-  }
+  // Set the real soc
+  float set_real_soc(float soc);
+  // Get scaled soc regardless of setting
+  float get_scaled_soc(void);
+  // Get real soc regardless of setting
+  float get_real_soc(void);
+  // Get scaled or real soc based on the scaling setting
+  float get_soc(void);
 };
-
 #endif

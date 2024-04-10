@@ -8,4 +8,4 @@ ModbusMessage FC06(ModbusMessage request);
 ModbusMessage FC16(ModbusMessage request);
 ModbusMessage FC23(ModbusMessage request);
 
-std::map<uint16_t, uint16_t>& mbServerFCs_GetMapRef(void);
+extern std::map<uint16_t, uint16_t> mbPVmap;

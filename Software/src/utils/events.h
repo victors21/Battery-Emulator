@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include "../system_include.h"
+#include "utils.h"
 
 #ifndef UNIT_TEST
 #include <Arduino.h>

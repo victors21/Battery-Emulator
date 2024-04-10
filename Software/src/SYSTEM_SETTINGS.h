@@ -1,6 +1,14 @@
 #ifndef _SYSTEM_SETTINGS_H_
 #define _SYSTEM_SETTINGS_H_
 
+/** SW VERSION
+ * 
+ * Parameter: SW_VERSION_STRING
+ * Description:
+ * Current SW version. Update when necessary
+*/
+#define SW_VERSION_STRING "6.0.0"
+
 /** WATCHDOG
  * 
  * Parameter: TASK_BACKGROUND_WATCHDOG_PERIOD
@@ -38,13 +46,8 @@
  * Description:
  * Defines the size of the queue for RX frames
  * 
- * Parameter: CAN_BAUD_RATE
- * Description:
- * Defines the baud rate for battery CAN.
- * 
 */
 #define CAN_RX_QUEUE_SIZE 10
-#define CAN_BAUD_RATE CAN_SPEED_500KBPS
 
 /** TASKS
  * 
@@ -59,7 +62,7 @@
 #define TASK_CORE_PRIO 4
 #define TASK_CONNECTIVITY_PRIO 3
 
-/** MAX AMOUNT OF CELLS 
+/** MAX AMOUNT OF CELLS
  * 
  * Parameter: MAX_AMOUNT_CELLS
  * Description:
@@ -71,7 +74,10 @@
  * 
  * Parameter: LED_MODE_DEFAULT
  * Description:
- * The default LED mode. Can be CLASSIC (slow up/down ramp) or FLOW (slow ramp up/down depending on flow of energy)
+ * The default LED mode. Available modes:
+ * CLASSIC   - slow up/down ramp
+ * FLOW      - slow ramp up or down depending on flow of energy
+ * HEARTBEAT - Heartbeat-like LED pattern that reacts to the system state with color and BPM
  * 
  * Parameter: LED_PERIOD_MS
  * Description:
@@ -80,5 +86,19 @@
 */
 #define LED_MODE_DEFAULT HEARTBEAT
 #define LED_PERIOD_MS 3000
+
+/** MODBUS
+ * 
+ * Parameter: MB_RTU_NUM_VALUES
+ * Description:
+ * Number of uint16_t's that the Modbus will keep
+ * 
+ * Parameter: MB_MAX_POWER
+ * Description:
+ * Modbus protocols have a limit to the power level.
+*/
+
+#define MB_RTU_NUM_VALUES 30000
+#define MB_MAX_POWER 40960  //BYD Modbus specific value
 
 #endif

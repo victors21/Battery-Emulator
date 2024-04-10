@@ -14,5 +14,5 @@ class ESP32CAN {
   void CANSetCfg(CAN_device_t* can_cfg);
 };
 
-extern ESP32CAN ESP32Can;
+extern ESP32CAN ESP32_can;
 #endif

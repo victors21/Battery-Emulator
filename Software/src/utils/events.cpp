@@ -1,4 +1,5 @@
 #include "events.h"
+#include "../system/datalayer/datalayer.h"
 
 #ifndef UNIT_TEST
 #include <EEPROM.h>
@@ -296,13 +297,13 @@ static void update_bms_status(void) {
     case EVENT_LEVEL_INFO:
     case EVENT_LEVEL_WARNING:
     case EVENT_LEVEL_DEBUG:
-      system_bms_status = bms_status_enum::ACTIVE;
+      datalayer.battery.status.bms_status = bms_status_enum::ACTIVE;
       break;
     case EVENT_LEVEL_UPDATE:
-      system_bms_status = bms_status_enum::UPDATING;
+      datalayer.battery.status.bms_status = bms_status_enum::UPDATING;
       break;
     case EVENT_LEVEL_ERROR:
-      system_bms_status = bms_status_enum::FAULT;
+      datalayer.battery.status.bms_status = bms_status_enum::FAULT;
       break;
     default:
       break;

@@ -21,7 +21,7 @@ class WatchdogHandler {
     esp_reset_reason_t reason = esp_reset_reason();
 
     if (reason == ESP_RST_TASK_WDT) {
-      // Increment and store the reset counter in case of a watchdog reset?
+      // Increment and store the reset counter in case of a watchdog reset? Future
     }
   }
 

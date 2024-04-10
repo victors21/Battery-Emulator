@@ -2,6 +2,8 @@
 #include <Arduino.h>
 #include "../../utils/events.h"
 
+CAN_device_t CAN_cfg;
+
 int ESP32CAN::CANInit() {
   return CAN_init();
 }
@@ -32,4 +34,8 @@ int ESP32CAN::CANConfigFilter(const CAN_filter_t* p_filter) {
   return CAN_config_filter(p_filter);
 }
 
-ESP32CAN ESP32Can;
+void ESP32CAN::CANSetCfg(CAN_device_t* can_cfg) {
+  CAN_cfg = *can_cfg;
+}
+
+ESP32CAN ESP32_can;

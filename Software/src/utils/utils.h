@@ -1,7 +1,6 @@
 #ifndef _UTILS_H_
 #define _UTILS_H_
 
-#include "debug_handler.h"
 #include "events.h"
 #include "mapping.h"
 #include "settings.h"

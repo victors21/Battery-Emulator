@@ -8,8 +8,7 @@
 
 // uint16_t mbPV[MBPV_MAX];
 
-static std::map<uint16_t, std::uint16_t> mbPVmap;
-static bool is_initialized = false;
+std::map<uint16_t, std::uint16_t> mbPVmap;
 
 // Server function to handle FC 0x03
 ModbusMessage FC03(ModbusMessage request)
@@ -234,9 +233,4 @@ ModbusMessage FC23(ModbusMessage request)
     LOG_V("%s\r\n", debugString);
 
     return response;
-}
-
-std::map<uint16_t, uint16_t>& mbServerFCs_GetMapRef(void)
-{
-    return mbPVmap;
 }
