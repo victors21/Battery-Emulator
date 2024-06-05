@@ -467,6 +467,9 @@ String processor(const String& var) {
 #ifdef TEST_FAKE_BATTERY
     content += "Fake battery for testing purposes";
 #endif
+#ifdef CHEVROLET_BOLT_BATTERY
+    content += "CHEVROLET BOLT EV BATTERY";
+#endif
     content += "</h4>";
 
 #if defined CHEVYVOLT_CHARGER || defined NISSANLEAF_CHARGER
