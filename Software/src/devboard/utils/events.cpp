@@ -5,7 +5,13 @@
 #endif
 
 #include "../../../USER_SETTINGS.h"
+#include "../../lib/YiannisBourkelis-Uptime-Library/src/uptime.h"
 #include "timer.h"
+
+// Time conversion macros
+#define DAYS_TO_SECS 86400  // 24 * 60 * 60
+#define HOURS_TO_SECS 3600  // 60 * 60
+#define MINUTES_TO_SECS 60
 
 #define EE_NOF_EVENT_ENTRIES 30
 #define EE_EVENT_ENTRY_SIZE sizeof(EVENT_LOG_ENTRY_TYPE)
@@ -44,7 +50,7 @@ typedef struct {
 
 typedef struct {
   EVENTS_STRUCT_TYPE entries[EVENT_NOF_EVENTS];
-  uint32_t time_seconds;
+  unsigned long time_seconds;
   MyTimer second_timer;
   MyTimer ee_timer;
   MyTimer update_timer;
@@ -133,20 +139,28 @@ void init_events(void) {
   events.entries[EVENT_CAN_RX_WARNING].level = EVENT_LEVEL_WARNING;
   events.entries[EVENT_CAN_TX_FAILURE].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_WATER_INGRESS].level = EVENT_LEVEL_ERROR;
+  events.entries[EVENT_CHARGE_LIMIT_EXCEEDED].level = EVENT_LEVEL_INFO;
+  events.entries[EVENT_DISCHARGE_LIMIT_EXCEEDED].level = EVENT_LEVEL_INFO;
   events.entries[EVENT_12V_LOW].level = EVENT_LEVEL_WARNING;
   events.entries[EVENT_SOC_PLAUSIBILITY_ERROR].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_KWH_PLAUSIBILITY_ERROR].level = EVENT_LEVEL_INFO;
   events.entries[EVENT_BATTERY_EMPTY].level = EVENT_LEVEL_INFO;
   events.entries[EVENT_BATTERY_FULL].level = EVENT_LEVEL_INFO;
+  events.entries[EVENT_BATTERY_FROZEN].level = EVENT_LEVEL_INFO;
   events.entries[EVENT_BATTERY_CAUTION].level = EVENT_LEVEL_INFO;
   events.entries[EVENT_BATTERY_CHG_STOP_REQ].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_BATTERY_DISCHG_STOP_REQ].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_BATTERY_CHG_DISCHG_STOP_REQ].level = EVENT_LEVEL_ERROR;
+  events.entries[EVENT_BATTERY_OVERHEAT].level = EVENT_LEVEL_ERROR;
+  events.entries[EVENT_BATTERY_OVERVOLTAGE].level = EVENT_LEVEL_WARNING;
+  events.entries[EVENT_BATTERY_UNDERVOLTAGE].level = EVENT_LEVEL_WARNING;
   events.entries[EVENT_LOW_SOH].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_HVIL_FAILURE].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_PRECHARGE_FAILURE].level = EVENT_LEVEL_INFO;
   events.entries[EVENT_INTERNAL_OPEN_FAULT].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_INVERTER_OPEN_CONTACTOR].level = EVENT_LEVEL_INFO;
+  events.entries[EVENT_MODBUS_INVERTER_MISSING].level = EVENT_LEVEL_INFO;
+  events.entries[EVENT_ERROR_OPEN_CONTACTOR].level = EVENT_LEVEL_INFO;
   events.entries[EVENT_CELL_UNDER_VOLTAGE].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_CELL_OVER_VOLTAGE].level = EVENT_LEVEL_ERROR;
   events.entries[EVENT_CELL_DEVIATION_HIGH].level = EVENT_LEVEL_WARNING;
@@ -165,7 +179,7 @@ void init_events(void) {
 
   events.entries[EVENT_EEPROM_WRITE].log = false;  // Don't log the logger...
 
-  events.second_timer.set_interval(1000);
+  events.second_timer.set_interval(600);
   // Write to EEPROM every X minutes (if an event has been set)
   events.ee_timer.set_interval(EE_WRITE_PERIOD_MINUTES * 60 * 1000);
   events.update_timer.set_interval(2000);
@@ -201,6 +215,10 @@ const char* get_event_message_string(EVENTS_ENUM_TYPE event) {
       return "ERROR: High amount of corrupted CAN messages detected. Check CAN wire shielding!";
     case EVENT_CAN_TX_FAILURE:
       return "ERROR: CAN messages failed to transmit, or no one on the bus to ACK the message!";
+    case EVENT_CHARGE_LIMIT_EXCEEDED:
+      return "Info: Inverter is charging faster than battery is allowing.";
+    case EVENT_DISCHARGE_LIMIT_EXCEEDED:
+      return "Info: Inverter is discharging faster than battery is allowing.";
     case EVENT_WATER_INGRESS:
       return "Water leakage inside battery detected. Operation halted. Inspect battery!";
     case EVENT_12V_LOW:
@@ -213,6 +231,8 @@ const char* get_event_message_string(EVENTS_ENUM_TYPE event) {
       return "Info: Battery is completely discharged";
     case EVENT_BATTERY_FULL:
       return "Info: Battery is fully charged";
+    case EVENT_BATTERY_FROZEN:
+      return "Info: Battery is too cold to operate optimally. Consider warming it up!";
     case EVENT_BATTERY_CAUTION:
       return "Info: Battery has raised a general caution flag. Might want to inspect it closely.";
     case EVENT_BATTERY_CHG_STOP_REQ:
@@ -225,6 +245,12 @@ const char* get_event_message_string(EVENTS_ENUM_TYPE event) {
       return "Info: COLD BATTERY! Battery requesting heating pads to activate!";
     case EVENT_BATTERY_WARMED_UP:
       return "Info: Battery requesting heating pads to stop. The battery is now warm enough.";
+    case EVENT_BATTERY_OVERHEAT:
+      return "ERROR: Battery overheated. Shutting down to prevent thermal runaway!";
+    case EVENT_BATTERY_OVERVOLTAGE:
+      return "Warning: Battery exceeding maximum design voltage. Discharge battery to prevent damage!";
+    case EVENT_BATTERY_UNDERVOLTAGE:
+      return "Warning: Battery under minimum design voltage. Charge battery to prevent damage!";
     case EVENT_LOW_SOH:
       return "ERROR: State of health critically low. Battery internal resistance too high to continue. Recycle "
              "battery.";
@@ -237,6 +263,11 @@ const char* get_event_message_string(EVENTS_ENUM_TYPE event) {
       return "ERROR: High voltage cable removed while battery running. Opening contactors!";
     case EVENT_INVERTER_OPEN_CONTACTOR:
       return "Info: Inverter side opened contactors. Normal operation.";
+    case EVENT_ERROR_OPEN_CONTACTOR:
+      return "Info: Too much time spent in error state. Opening contactors, not safe to continue charging. "
+             "Check other error code for reason!";
+    case EVENT_MODBUS_INVERTER_MISSING:
+      return "Info: Modbus inverter has not sent any data. Inspect communication wiring!";
     case EVENT_CELL_UNDER_VOLTAGE:
       return "ERROR: CELL UNDERVOLTAGE!!! Stopping battery charging and discharging. Inspect battery!";
     case EVENT_CELL_OVER_VOLTAGE:
@@ -352,9 +383,18 @@ static void update_event_level(void) {
 }
 
 static void update_event_time(void) {
+  // This should run roughly 2 times per second
   if (events.second_timer.elapsed() == true) {
-    events.time_seconds++;
+    uptime::calculateUptime();  // millis() overflows every 50 days, so update occasionally to adjust
+    events.time_seconds = uptime::getDays() * DAYS_TO_SECS;
+    events.time_seconds += uptime::getHours() * HOURS_TO_SECS;
+    events.time_seconds += uptime::getMinutes() * MINUTES_TO_SECS;
+    events.time_seconds += uptime::getSeconds();
   }
+}
+
+unsigned long get_current_event_time_secs(void) {
+  return events.time_seconds;
 }
 
 static void log_event(EVENTS_ENUM_TYPE event, uint8_t data) {

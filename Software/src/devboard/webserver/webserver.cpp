@@ -30,7 +30,7 @@ bool ota_active = false;
 unsigned const long WIFI_MONITOR_INTERVAL_TIME = 15000;
 unsigned const long INIT_WIFI_CONNECT_TIMEOUT = 8000;        // Timeout for initial WiFi connect in milliseconds
 unsigned const long DEFAULT_WIFI_RECONNECT_INTERVAL = 1000;  // Default WiFi reconnect interval in ms
-unsigned const long MAX_WIFI_RETRY_INTERVAL = 30000;         // Maximum wifi retry interval in ms
+unsigned const long MAX_WIFI_RETRY_INTERVAL = 90000;         // Maximum wifi retry interval in ms
 unsigned long last_wifi_monitor_time = millis();             //init millis so wifi monitor doesn't run immediately
 unsigned long wifi_reconnect_interval = DEFAULT_WIFI_RECONNECT_INTERVAL;
 unsigned long last_wifi_attempt_time = millis();  //init millis so wifi monitor doesn't run immediately
@@ -346,6 +346,9 @@ void init_WiFi_STA(const char* ssid, const char* password, const uint8_t wifi_ch
   WiFi.begin(ssid, password, wifi_channel);
   WiFi.setAutoReconnect(true);  // Enable auto reconnect
   wl_status_t result = static_cast<wl_status_t>(WiFi.waitForConnectResult(INIT_WIFI_CONNECT_TIMEOUT));
+  if (result) {
+    //TODO: Add event or serial print?
+  }
 }
 
 // Function to initialize ElegantOTA
@@ -358,8 +361,9 @@ void init_ElegantOTA() {
 }
 
 String processor(const String& var) {
-  if (var == "ABC") {
+  if (var == "X") {
     String content = "";
+    content += "<h2>" + String(ssidAP) + "</h2>";  // ssidAP name is used as header name
     //Page format
     content += "<style>";
     content += "body { background-color: black; color: white; }";
@@ -370,6 +374,7 @@ String processor(const String& var) {
 
     // Show version number
     content += "<h4>Software: " + String(version_number) + "</h4>";
+    content += "<h4>Uptime: " + uptime_formatter::getUptime() + "</h4>";
 #ifdef FUNCTION_TIME_MEASUREMENT
     // Load information
     content += "<h4>Core task max load: " + String(datalayer.system.status.core_task_max_us) + " us</h4>";
@@ -446,6 +451,9 @@ String processor(const String& var) {
 #ifdef KIA_E_GMP_BATTERY
     content += "Kia/Hyundai EGMP platform";
 #endif
+#ifdef MG_5_BATTERY
+    content += "MG 5";
+#endif
 #ifdef NISSAN_LEAF_BATTERY
     content += "Nissan LEAF";
 #endif
@@ -486,7 +494,7 @@ String processor(const String& var) {
     // Close the block
     content += "</div>";
 
-    // Start a new block with a specific background color. Color changes depending on BMS status
+    // Start a new block with a specific background color. Color changes depending on system status
     content += "<div style='background-color: ";
     switch (led_get_color()) {
       case led_color::GREEN:
@@ -540,11 +548,11 @@ String processor(const String& var) {
     content += "<h4>Temperature max: " + String(tempMaxFloat, 1) + " C</h4>";
     content += "<h4>Temperature min: " + String(tempMinFloat, 1) + " C</h4>";
     if (datalayer.battery.status.bms_status == ACTIVE) {
-      content += "<h4>BMS Status: OK </h4>";
+      content += "<h4>System status: OK </h4>";
     } else if (datalayer.battery.status.bms_status == UPDATING) {
-      content += "<h4>BMS Status: UPDATING </h4>";
+      content += "<h4>System status: UPDATING </h4>";
     } else {
-      content += "<h4>BMS Status: FAULT </h4>";
+      content += "<h4>System status: FAULT </h4>";
     }
     if (datalayer.battery.status.current_dA == 0) {
       content += "<h4>Battery idle</h4>";

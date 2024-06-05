@@ -14,12 +14,15 @@
 #include "src/devboard/utils/events.h"
 #include "src/devboard/utils/led_handler.h"
 #include "src/devboard/utils/value_mapping.h"
+#include "src/lib/YiannisBourkelis-Uptime-Library/src/uptime.h"
+#include "src/lib/YiannisBourkelis-Uptime-Library/src/uptime_formatter.h"
 #include "src/lib/bblanchon-ArduinoJson/ArduinoJson.h"
 #include "src/lib/eModbus-eModbus/Logging.h"
 #include "src/lib/eModbus-eModbus/ModbusServerRTU.h"
 #include "src/lib/eModbus-eModbus/scripts/mbServerFCs.h"
 #include "src/lib/miwagner-ESP32-Arduino-CAN/CAN_config.h"
 #include "src/lib/miwagner-ESP32-Arduino-CAN/ESP32CAN.h"
+#include "src/lib/smaresca-SimpleISA/SimpleISA.h"
 
 #include "src/datalayer/datalayer.h"
 
@@ -30,7 +33,7 @@
 
 Preferences settings;  // Store user settings
 // The current software version, shown on webserver
-const char* version_number = "5.9.dev";
+const char* version_number = "6.1.dev";
 
 // Interval settings
 uint16_t intervalUpdateValues = INTERVAL_5_S;  // Interval at which to update inverter values / Modbus registers
@@ -53,11 +56,15 @@ ACAN2517FD canfd(MCP2517_CS, SPI, MCP2517_INT);
 #endif
 
 // ModbusRTU parameters
-#if defined(BYD_MODBUS) || defined(LUNA2000_MODBUS)
+#ifdef MODBUS_INVERTER_SELECTED
 #define MB_RTU_NUM_VALUES 30000
 uint16_t mbPV[MB_RTU_NUM_VALUES];  // Process variable memory
 // Create a ModbusRTU server instance listening on Serial2 with 2000ms timeout
 ModbusServerRTU MBserver(Serial2, 2000);
+#endif
+
+#ifdef ISA_SHUNT
+ISA sensor;
 #endif
 
 // Common charger parameters
@@ -89,7 +96,10 @@ MyTimer loop_task_timer_10s(INTERVAL_10_S);
 enum State { DISCONNECTED, PRECHARGE, NEGATIVE, POSITIVE, PRECHARGE_OFF, COMPLETED, SHUTDOWN_REQUESTED };
 State contactorStatus = DISCONNECTED;
 
-#define MAX_ALLOWED_FAULT_TICKS 500
+#define MAX_ALLOWED_FAULT_TICKS 1000
+/* NOTE: modify the precharge time constant below to account for the resistance and capacitance of the target system.
+ *	t=3RC at minimum, t=5RC ideally 
+ */
 #define PRECHARGE_TIME_MS 160
 #define NEGATIVE_CONTACTOR_TIME_MS 1000
 #define POSITIVE_CONTACTOR_TIME_MS 2000
@@ -129,11 +139,11 @@ void setup() {
 
   init_contactors();
 
-  init_modbus();
+  init_rs485();
 
   init_serialDataLink();
 
-  inform_user_on_inverter();
+  init_inverter();
 
   init_battery();
 
@@ -182,12 +192,8 @@ void core_loop(void* task_time_us) {
   TickType_t xLastWakeTime = xTaskGetTickCount();
   const TickType_t xFrequency = pdMS_TO_TICKS(1);  // Convert 1ms to ticks
   led_init();
-  int64_t prev_wake;
 
   while (true) {
-    int64_t now = esp_timer_get_time();
-    int64_t wake_period = now - prev_wake;
-    prev_wake = now;
     START_TIME_MEASUREMENT(all);
     START_TIME_MEASUREMENT(comm);
     // Input
@@ -223,9 +229,13 @@ void core_loop(void* task_time_us) {
     START_TIME_MEASUREMENT(time_5s);
     if (millis() - previousMillisUpdateVal >= intervalUpdateValues)  // Every 5s normally
     {
-      previousMillisUpdateVal = millis();
-      update_SOC();     // Check if real or calculated SOC% value should be sent
-      update_values();  // Update values heading towards inverter. Prepare for sending on CAN, or write directly to Modbus.
+      previousMillisUpdateVal = millis();  // Order matters on the update_loop!
+      update_values_battery();             // Fetch battery values
+      update_SOC();                        // Check if real or calculated SOC% value should be sent
+#ifndef SERIAL_LINK_RECEIVER
+      update_machineryprotection();  // Check safeties (Not on serial link reciever board)
+#endif
+      update_values_inverter();  // Update values heading towards inverter
       if (DUMMY_EVENT_ENABLED) {
         set_event(EVENT_DUMMY_ERROR, (uint8_t)millis());
       }
@@ -334,9 +344,11 @@ void init_stored_settings() {
 }
 
 void init_CAN() {
-  // CAN pins
+// CAN pins
+#ifdef CAN_SE_PIN
   pinMode(CAN_SE_PIN, OUTPUT);
   digitalWrite(CAN_SE_PIN, LOW);
+#endif
   CAN_cfg.speed = CAN_SPEED_500KBPS;
   CAN_cfg.tx_pin_id = GPIO_NUM_27;
   CAN_cfg.rx_pin_id = GPIO_NUM_26;
@@ -364,6 +376,7 @@ void init_CAN() {
                               DataBitRateFactor::x4);      // Arbitration bit rate: 500 kbit/s, data bit rate: 2 Mbit/s
   settings.mRequestedMode = ACAN2517FDSettings::NormalFD;  // ListenOnly / Normal20B / NormalFD
   const uint32_t errorCode = canfd.begin(settings, [] { canfd.isr(); });
+  canfd.poll();
   if (errorCode == 0) {
 #ifdef DEBUG_VIA_USB
     Serial.print("Bit Rate prescaler: ");
@@ -401,28 +414,39 @@ void init_contactors() {
   pinMode(NEGATIVE_CONTACTOR_PIN, OUTPUT);
   digitalWrite(NEGATIVE_CONTACTOR_PIN, LOW);
 #ifdef PWM_CONTACTOR_CONTROL
-  ledcSetup(POSITIVE_PWM_Ch, PWM_Freq, PWM_Res);           // Setup PWM Channel Frequency and Resolution
-  ledcSetup(NEGATIVE_PWM_Ch, PWM_Freq, PWM_Res);           // Setup PWM Channel Frequency and Resolution
-  ledcAttachPin(POSITIVE_CONTACTOR_PIN, POSITIVE_PWM_Ch);  // Attach Positive Contactor Pin to Hardware PWM Channel
-  ledcAttachPin(NEGATIVE_CONTACTOR_PIN, NEGATIVE_PWM_Ch);  // Attach Positive Contactor Pin to Hardware PWM Channel
-  ledcWrite(POSITIVE_PWM_Ch, 0);                           // Set Positive PWM to 0%
-  ledcWrite(NEGATIVE_PWM_Ch, 0);                           // Set Negative PWM to 0%
+  ledcAttachChannel(POSITIVE_CONTACTOR_PIN, PWM_Freq, PWM_Res,
+                    POSITIVE_PWM_Ch);  // Setup PWM Channel Frequency and Resolution
+  ledcAttachChannel(NEGATIVE_CONTACTOR_PIN, PWM_Freq, PWM_Res,
+                    NEGATIVE_PWM_Ch);  // Setup PWM Channel Frequency and Resolution
+  ledcWrite(POSITIVE_PWM_Ch, 0);       // Set Positive PWM to 0%
+  ledcWrite(NEGATIVE_PWM_Ch, 0);       // Set Negative PWM to 0%
 #endif
   pinMode(PRECHARGE_PIN, OUTPUT);
   digitalWrite(PRECHARGE_PIN, LOW);
 #endif
+// Init BMS contactor
+#ifdef HW_STARK  // TODO: Rewrite this so LilyGo can aslo handle this BMS contactor
+  pinMode(BMS_POWER, OUTPUT);
+  digitalWrite(BMS_POWER, HIGH);
+#endif
 }
 
-void init_modbus() {
-#if defined(BYD_MODBUS) || defined(LUNA2000_MODBUS)
-  // Set up Modbus RTU Server
+void init_rs485() {
+// Set up Modbus RTU Server
+#ifdef RS485_EN_PIN
   pinMode(RS485_EN_PIN, OUTPUT);
   digitalWrite(RS485_EN_PIN, HIGH);
+#endif
+#ifdef RS485_SE_PIN
   pinMode(RS485_SE_PIN, OUTPUT);
   digitalWrite(RS485_SE_PIN, HIGH);
+#endif
+#ifdef PIN_5V_EN
   pinMode(PIN_5V_EN, OUTPUT);
   digitalWrite(PIN_5V_EN, HIGH);
+#endif
 
+#ifdef MODBUS_INVERTER_SELECTED
 #ifdef BYD_MODBUS
   // Init Static data to the RTU Modbus
   handle_static_data_modbus_byd();
@@ -441,64 +465,44 @@ void init_modbus() {
 #endif
 }
 
-void inform_user_on_inverter() {
-  // Inform user what Inverter is used
-#ifdef BYD_CAN
-#ifdef DEBUG_VIA_USB
-  Serial.println("BYD CAN protocol selected");
-#endif
-#endif
-#ifdef BYD_MODBUS
-#ifdef DEBUG_VIA_USB
-  Serial.println("BYD Modbus RTU protocol selected");
-#endif
-#endif
-#ifdef LUNA2000_MODBUS
-#ifdef DEBUG_VIA_USB
-  Serial.println("Luna2000 Modbus RTU protocol selected");
-#endif
-#endif
-#ifdef PYLON_CAN
-#ifdef DEBUG_VIA_USB
-  Serial.println("PYLON CAN protocol selected");
-#endif
-#endif
-#ifdef SMA_CAN
-#ifdef DEBUG_VIA_USB
-  Serial.println("SMA CAN protocol selected");
-#endif
-#endif
-#ifdef SMA_TRIPOWER_CAN
-#ifdef DEBUG_VIA_USB
-  Serial.println("SMA Tripower CAN protocol selected");
-#endif
-#endif
-#ifdef SOFAR_CAN
-#ifdef DEBUG_VIA_USB
-  Serial.println("SOFAR CAN protocol selected");
-#endif
-#endif
+void init_inverter() {
 #ifdef SOLAX_CAN
-  datalayer.system.status.inverter_allows_contactor_closing =
-      false;                   // The inverter needs to allow first on this protocol
+  datalayer.system.status.inverter_allows_contactor_closing = false;  // The inverter needs to allow first
   intervalUpdateValues = 800;  // This protocol also requires the values to be updated faster
-#ifdef DEBUG_VIA_USB
-  Serial.println("SOLAX CAN protocol selected");
-#endif
 #endif
 }
 
 void init_battery() {
   // Inform user what battery is used and perform setup
   setup_battery();
+
+#ifdef CHADEMO_BATTERY
+  intervalUpdateValues = 800;  // This mode requires the values to be updated faster
+#endif
 }
 
 #ifdef CAN_FD
 // Functions
+#ifdef DEBUG_CANFD_DATA
+void print_canfd_frame(CANFDMessage rx_frame) {
+  int i = 0;
+  Serial.print(rx_frame.id, HEX);
+  Serial.print(" ");
+  for (i = 0; i < rx_frame.len; i++) {
+    Serial.print(rx_frame.data[i] < 16 ? "0" : "");
+    Serial.print(rx_frame.data[i], HEX);
+    Serial.print(" ");
+  }
+  Serial.println(" ");
+}
+#endif
 void receive_canfd() {  // This section checks if we have a complete CAN-FD message incoming
   CANFDMessage frame;
   if (canfd.available()) {
     canfd.receive(frame);
+#ifdef DEBUG_CANFD_DATA
+    print_canfd_frame(frame);
+#endif
     receive_canfd_battery(frame);
   }
 }
@@ -508,105 +512,66 @@ void receive_can() {  // This section checks if we have a complete CAN message i
   // Depending on which battery/inverter is selected, we forward this to their respective CAN routines
   CAN_frame_t rx_frame;
   if (xQueueReceive(CAN_cfg.rx_queue, &rx_frame, 0) == pdTRUE) {
-    if (rx_frame.FIR.B.FF == CAN_frame_std) {  // New standard frame
-// Battery
-#ifndef SERIAL_LINK_RECEIVER
-      receive_can_battery(rx_frame);
+
+    //ISA Shunt
+#ifdef ISA_SHUNT
+    sensor.handleFrame(&rx_frame);
 #endif
-      // Inverter
-#ifdef BYD_CAN
-      receive_can_byd(rx_frame);
+    // Battery
+#ifndef SERIAL_LINK_RECEIVER  // Only needs to see inverter
+    receive_can_battery(rx_frame);
 #endif
-#ifdef SMA_CAN
-      receive_can_sma(rx_frame);
+    // Inverter
+#ifdef CAN_INVERTER_SELECTED
+    receive_can_inverter(rx_frame);
 #endif
-#ifdef SMA_TRIPOWER_CAN
-      receive_can_sma_tripower(rx_frame);
+    // Charger
+#ifdef CHARGER_SELECTED
+    receive_can_charger(rx_frame);
 #endif
-      // Charger
-#ifdef CHEVYVOLT_CHARGER
-      receive_can_chevyvolt_charger(rx_frame);
-#endif
-#ifdef NISSANLEAF_CHARGER
-      receive_can_nissanleaf_charger(rx_frame);
-#endif
-    } else {  // New extended frame
-#ifdef PYLON_CAN
-      receive_can_pylon(rx_frame);
-#endif
-#ifdef SOFAR_CAN
-      receive_can_sofar(rx_frame);
-#endif
-#ifdef SOLAX_CAN
-      receive_can_solax(rx_frame);
-#endif
-    }
   }
 }
 
 void send_can() {
-  // Send CAN messages
-  // Inverter
-#ifdef BYD_CAN
-  send_can_byd();
-#endif
-#ifdef SMA_CAN
-  send_can_sma();
-#endif
-#ifdef SMA_TRIPOWER_CAN
-  send_can_sma_tripower();
-#endif
-#ifdef SOFAR_CAN
-  send_can_sofar();
-#endif
   // Battery
   send_can_battery();
-  // Charger
-#ifdef CHEVYVOLT_CHARGER
-  send_can_chevyvolt_charger();
+  // Inverter
+#ifdef CAN_INVERTER_SELECTED
+  send_can_inverter();
 #endif
-#ifdef NISSANLEAF_CHARGER
-  send_can_nissanleaf_charger();
+  // Charger
+#ifdef CHARGER_SELECTED
+  send_can_charger();
 #endif
 }
 
 #ifdef DUAL_CAN
 void receive_can2() {  // This function is similar to receive_can, but just takes care of inverters in the 2nd bus.
   // Depending on which inverter is selected, we forward this to their respective CAN routines
-  CAN_frame_t rx_frame2;    // Struct with ESP32Can library format, compatible with the rest of the program
-  CANMessage MCP2515Frame;  // Struct with ACAN2515 library format, needed to use thw MCP2515 library
+  CAN_frame_t rx_frame_can2;  // Struct with ESP32Can library format, compatible with the rest of the program
+  CANMessage MCP2515Frame;    // Struct with ACAN2515 library format, needed to use thw MCP2515 library
 
   if (can.available()) {
     can.receive(MCP2515Frame);
 
-    rx_frame2.MsgID = MCP2515Frame.id;
-    rx_frame2.FIR.B.FF = MCP2515Frame.ext ? CAN_frame_ext : CAN_frame_std;
-    rx_frame2.FIR.B.RTR = MCP2515Frame.rtr ? CAN_RTR : CAN_no_RTR;
-    rx_frame2.FIR.B.DLC = MCP2515Frame.len;
+    rx_frame_can2.MsgID = MCP2515Frame.id;
+    rx_frame_can2.FIR.B.FF = MCP2515Frame.ext ? CAN_frame_ext : CAN_frame_std;
+    rx_frame_can2.FIR.B.RTR = MCP2515Frame.rtr ? CAN_RTR : CAN_no_RTR;
+    rx_frame_can2.FIR.B.DLC = MCP2515Frame.len;
     for (uint8_t i = 0; i < MCP2515Frame.len; i++) {
-      rx_frame2.data.u8[i] = MCP2515Frame.data[i];
+      rx_frame_can2.data.u8[i] = MCP2515Frame.data[i];
     }
 
-    if (rx_frame2.FIR.B.FF == CAN_frame_std) {  // New standard frame
-#ifdef BYD_CAN
-      receive_can_byd(rx_frame2);
+#ifdef CAN_INVERTER_SELECTED
+    receive_can_inverter(rx_frame_can2);
 #endif
-    } else {  // New extended frame
-#ifdef PYLON_CAN
-      receive_can_pylon(rx_frame2);
-#endif
-#ifdef SOLAX_CAN
-      receive_can_solax(rx_frame2);
-#endif
-    }
   }
 }
 
 void send_can2() {
-  // Send CAN
   // Inverter
-#ifdef BYD_CAN
-  send_can_byd();
+#ifdef CAN_INVERTER_SELECTED
+  send_can_inverter();  //Note this will only send to CAN1, unless we use SOLAX
 #endif
 }
 #endif
@@ -627,6 +592,7 @@ void handle_contactors() {
     digitalWrite(PRECHARGE_PIN, LOW);
     digitalWrite(NEGATIVE_CONTACTOR_PIN, LOW);
     digitalWrite(POSITIVE_CONTACTOR_PIN, LOW);
+    set_event(EVENT_ERROR_OPEN_CONTACTOR, 0);
     return;  // A fault scenario latches the contactor control. It is not possible to recover without a powercycle (and investigation why fault occured)
   }
 
@@ -733,33 +699,12 @@ void update_SOC() {
   }
 }
 
-void update_values() {
-  // Battery
-  update_values_battery();  // Map the fake values to the correct registers
-  // Inverter
-#ifdef BYD_CAN
-  update_values_can_byd();
+void update_values_inverter() {
+#ifdef CAN_INVERTER_SELECTED
+  update_values_can_inverter();
 #endif
-#ifdef BYD_MODBUS
-  update_modbus_registers_byd();
-#endif
-#ifdef LUNA2000_MODBUS
-  update_modbus_registers_luna2000();
-#endif
-#ifdef PYLON_CAN
-  update_values_can_pylon();
-#endif
-#ifdef SMA_CAN
-  update_values_can_sma();
-#endif
-#ifdef SMA_TRIPOWER_CAN
-  update_values_can_sma_tripower();
-#endif
-#ifdef SOFAR_CAN
-  update_values_can_sofar();
-#endif
-#ifdef SOLAX_CAN
-  update_values_can_solax();
+#ifdef MODBUS_INVERTER_SELECTED
+  update_modbus_registers_inverter();
 #endif
 }
 
